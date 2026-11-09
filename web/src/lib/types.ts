@@ -18,7 +18,7 @@ export type Item = {
   unit: PriceUnit;
   stock: number;
   replacementPrice: number; // dasar denda (FR-40)
-  image?: string;
+  image: string | null;
 };
 
 export type Package = {
@@ -29,7 +29,7 @@ export type Package = {
   guestCapacity: number;
   price: number;
   contents: { itemId: string; qty: number }[];
-  image?: string;
+  image: string | null;
 };
 
 export type DeliveryZone = { id: string; name: string; maxKm: number; fee: number };

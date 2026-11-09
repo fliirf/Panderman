@@ -16,7 +16,7 @@ export const CATEGORY_ICON = {
 } satisfies Record<Category, unknown>;
 
 /** Foto barang. Tanpa foto: bidang kawung bernuansa pinus, bukan kotak kosong. */
-export function ItemImage({ category, image, alt, className, sizes = "(min-width: 1024px) 25vw, 50vw", priority, iconSize = 36 }: { category: Category | "paket"; image?: string; alt: string; className?: string; sizes?: string; priority?: boolean; iconSize?: number }) {
+export function ItemImage({ category, image, alt, className, sizes = "(min-width: 1024px) 25vw, 50vw", priority, iconSize = 36 }: { category: Category | "paket"; image?: string | null; alt: string; className?: string; sizes?: string; priority?: boolean; iconSize?: number }) {
   const Icon = category === "paket" ? PackageIcon : CATEGORY_ICON[category];
   return (
     <div className={cn("relative overflow-hidden bg-secondary", className)}>

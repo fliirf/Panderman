@@ -1,26 +1,104 @@
 import "server-only";
+import { connection } from "next/server";
 import { availableQty, lockedInstallDates } from "../booking.ts";
 import { addDays } from "../dates.ts";
 import type { Category, ISODate } from "../types";
 import { currentUserId, items, orders, packages, settings } from "./mock";
+import { prisma } from "@/lib/prisma";
 
 // Satu-satunya pintu data untuk UI. Tahap backend: isi fungsi ini diganti query Prisma.
 
-export async function getItems(filter: { category?: Category; q?: string; maxPrice?: number } = {}) {
-  return items.filter(
-    (i) =>
-      (!filter.category || i.category === filter.category) &&
-      (!filter.q || i.name.toLowerCase().includes(filter.q.toLowerCase())) &&
-      (!filter.maxPrice || i.price <= filter.maxPrice),
-  );
-}
-export const getAllItems = async () => items;
-export const getItem = async (slug: string) => items.find((i) => i.slug === slug);
 
-export async function getPackages(filter: { minGuests?: number } = {}) {
-  return packages.filter((p) => !filter.minGuests || p.guestCapacity >= filter.minGuests);
+export async function getItems(
+  filter: { category?: Category; q?: string; maxPrice?: number } = {}
+) {
+  await connection();
+
+  return prisma.item.findMany({
+    where: {
+      ...(filter.category && {
+        category: filter.category,
+      }),
+      ...(filter.q && {
+        name: {
+          contains: filter.q,
+          mode: "insensitive",
+        },
+      }),
+      ...(filter.maxPrice !== undefined && {
+        price: {
+          lte: filter.maxPrice,
+        },
+      }),
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
 }
-export const getPackage = async (slug: string) => packages.find((p) => p.slug === slug);
+
+
+export async function getAllItems() {
+  await connection();
+
+  return prisma.item.findMany({
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+}
+
+
+export async function getItem(slug: string) {
+  await connection();
+
+  return prisma.item.findUnique({
+    where: { slug },
+  });
+}
+
+export async function getPackages(
+  filter: { minGuests?: number } = {}
+) {
+  await connection();
+
+  return prisma.package.findMany({
+    where: {
+      ...(filter.minGuests !== undefined && {
+        guestCapacity: {
+          gte: filter.minGuests,
+        },
+      }),
+    },
+    include: {
+      contents: {
+        select: {
+          itemId: true,
+          qty: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+}
+
+export async function getPackage(slug: string) {
+  await connection();
+
+  return prisma.package.findUnique({
+    where: { slug },
+    include: {
+      contents: {
+        select: {
+          itemId: true,
+          qty: true,
+        },
+      },
+    },
+  });
+}
 
 export const getSettings = async () => settings;
 

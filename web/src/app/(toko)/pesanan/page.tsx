@@ -6,11 +6,31 @@ import { buttonVariants } from "@/components/ui/button";
 import { getAllItems, getMyOrders, getPackages, getSettings } from "@/lib/data";
 import { rupiah, tanggal } from "@/lib/format";
 import { orderSummary } from "@/lib/order-utils";
+import { Suspense } from "react";
 
 export const metadata: Metadata = { title: "Pesanan saya" };
 
-export default async function PesananPage() {
-  const [orders, items, packages, settings] = await Promise.all([getMyOrders(), getAllItems(), getPackages(), getSettings()]);
+export default function PesananPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-8 text-center">
+          Memuat data pesanan...
+        </div>
+      }
+    >
+      <PesananContent />
+    </Suspense>
+  );
+}
+
+async function PesananContent() {
+  const [orders, items, packages, settings] = await Promise.all([
+    getMyOrders(),
+    getAllItems(),
+    getPackages(),
+    getSettings(),
+  ]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-8 px-4 py-10 sm:px-6">

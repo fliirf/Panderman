@@ -7,6 +7,7 @@ import { HERO_PHOTO } from "@/lib/data/mock";
 import { CATEGORY_LABEL, rupiah } from "@/lib/format";
 import { SITE } from "@/lib/site";
 import type { Category } from "@/lib/types";
+import { Suspense } from "react";
 
 const STEPS = [
   { title: "Pilih tanggal, lalu barang", body: "Sisa stok langsung menyesuaikan tanggal acara, termasuk hari pasang dan bongkar." },
@@ -15,8 +16,25 @@ const STEPS = [
   { title: "Terima nota, tinggal hajatan", body: "Nota terbit otomatis. Tim kembali H+1 untuk membongkar." },
 ];
 
-export default async function Home() {
-  const [items, packages] = await Promise.all([getAllItems(), getPackages()]);
+export default function Home() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-8 text-center">
+          Memuat katalog Panderman...
+        </div>
+      }
+    >
+      <HomeContent />
+    </Suspense>
+  );
+}
+
+async function HomeContent() {
+  const [items, packages] = await Promise.all([
+    getAllItems(),
+    getPackages(),
+  ]);
   const cats = (Object.keys(CATEGORY_LABEL) as Category[]).map((c) => {
     const list = items.filter((i) => i.category === c);
     return { c, count: list.length, cover: list[0]?.image, from: Math.min(...list.map((i) => i.price)) };

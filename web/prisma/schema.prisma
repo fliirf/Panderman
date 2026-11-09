@@ -1,0 +1,385 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================
+// ENUM
+// ============================
+
+enum UserRole {
+  user
+  admin
+}
+
+enum Category {
+  tenda
+  kursi
+  meja
+  lighting
+  dekorasi
+  prasmanan
+}
+
+enum PriceUnit {
+  unit
+  set
+  m2
+}
+
+enum OrderStatus {
+  menunggu_jadwal
+  menunggu_pembayaran
+  menunggu_verifikasi
+  dp_terverifikasi
+  lunas
+  dibatalkan
+  selesai
+}
+
+enum OrderLineKind {
+  item
+  package
+}
+
+enum PaymentScheme {
+  dp
+  lunas
+}
+
+enum PaymentMethod {
+  transfer
+  tunai
+}
+
+enum PaymentType {
+  dp
+  pelunasan
+  lunas
+  denda
+}
+
+enum PaymentStatus {
+  menunggu
+  terverifikasi
+  ditolak
+}
+
+enum PrasmananMode {
+  antar
+  ambil
+}
+
+enum ProposalStatus {
+  menunggu
+  disetujui
+  ditolak
+}
+
+// ============================
+// BETTER AUTH
+// ============================
+
+model User {
+  id              String    @id @default(cuid())
+  name            String
+  email           String    @unique
+  emailVerified   Boolean   @default(false)
+  image           String?
+  phone           String?
+  role            UserRole  @default(user)
+  twoFactorEnabled Boolean @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sessions  Session[]
+  accounts  Account[]
+  orders    Order[]
+  twoFactor TwoFactor?
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+// ============================
+// BARANG DAN PAKET
+// ============================
+
+model Item {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  name             String
+  category         Category
+  description      String
+  spec             String
+  price            Int
+  unit             PriceUnit
+  stock            Int
+  replacementPrice Int
+  image            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  packageItems PackageItem[]
+  orderLines   OrderLine[]
+  returnDamages ReturnDamage[]
+}
+
+model Package {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  description   String
+  guestCapacity Int
+  price         Int
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  contents   PackageItem[]
+  orderLines OrderLine[]
+}
+
+model PackageItem {
+  id        String @id @default(cuid())
+  packageId String
+  itemId    String
+  qty       Int
+
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  item    Item    @relation(fields: [itemId], references: [id])
+
+  @@unique([packageId, itemId])
+  @@index([itemId])
+}
+
+// ============================
+// PESANAN
+// ============================
+
+model Order {
+  id        String      @id @default(cuid())
+  code      String      @unique
+  userId    String
+  status    OrderStatus @default(menunggu_jadwal)
+
+  // Snapshot data pelanggan saat pemesanan
+  customerName  String
+  customerPhone String
+  customerEmail String?
+
+  eventStart  DateTime
+  eventEnd    DateTime
+  installDate DateTime?
+  teardownDate DateTime
+
+  // Informasi prasmanan
+  prasmananMode       PrasmananMode?
+  prasmananPickupDate DateTime?
+  prasmananReturnDate DateTime?
+
+  // Informasi alamat pengiriman
+  addressText String?
+  addressNote String?
+  deliveryZoneId String?
+
+  extraDays Int          @default(0)
+  scheme    PaymentScheme
+  method    PaymentMethod
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id])
+  deliveryZone DeliveryZone? @relation(fields: [deliveryZoneId], references: [id])
+  lines        OrderLine[]
+  payments     Payment[]
+  proposals    ScheduleProposal[]
+  returnRecord ReturnRecord?
+
+  @@index([userId])
+  @@index([status])
+  @@index([eventStart, eventEnd])
+}
+
+// Detail barang atau paket yang dipesan
+model OrderLine {
+  id        String        @id @default(cuid())
+  orderId   String
+  kind      OrderLineKind
+  itemId    String?
+  packageId String?
+  qty       Int
+  price     Int
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  item    Item?    @relation(fields: [itemId], references: [id])
+  package Package? @relation(fields: [packageId], references: [id])
+
+  @@index([orderId])
+  @@index([itemId])
+  @@index([packageId])
+}
+
+// ============================
+// PEMBAYARAN
+// ============================
+
+model Payment {
+  id        String        @id @default(cuid())
+  orderId   String
+  type      PaymentType
+  method    PaymentMethod
+  amount    Int
+  status    PaymentStatus @default(menunggu)
+  proofUrl  String?
+  note      String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+}
+
+// ============================
+// USULAN PERUBAHAN JADWAL
+// ============================
+
+model ScheduleProposal {
+  id          String         @id @default(cuid())
+  orderId     String
+  installDate DateTime
+  extraDays   Int            @default(0)
+  note        String
+  status      ProposalStatus @default(menunggu)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+// ============================
+// PENGEMBALIAN DAN DENDA
+// ============================
+
+model ReturnRecord {
+  id          String   @id @default(cuid())
+  orderId     String   @unique
+  note        String?
+  totalPenalty Int     @default(0)
+  returnedAt  DateTime @default(now())
+
+  order  Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  damages ReturnDamage[]
+}
+
+model ReturnDamage {
+  id             String @id @default(cuid())
+  returnRecordId String
+  itemId         String
+  qty            Int
+  penaltyAmount  Int
+
+  returnRecord ReturnRecord @relation(fields: [returnRecordId], references: [id], onDelete: Cascade)
+  item         Item         @relation(fields: [itemId], references: [id])
+
+  @@index([returnRecordId])
+  @@index([itemId])
+}
+
+// ============================
+// PENGATURAN TOKO
+// ============================
+
+model DeliveryZone {
+  id     String @id @default(cuid())
+  name   String
+  maxKm  Int
+  fee    Int
+
+  orders Order[]
+}
+
+model BankAccount {
+  id        String   @id @default(cuid())
+  bank      String
+  number    String
+  holder    String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Settings {
+  id                String   @id @default("main")
+  dpPercent         Int      @default(50)
+  dpDeadlineHours   Int      @default(24)
+  extraDayRate      Int      @default(250000)
+  minDaysBefore     Int      @default(1)
+  maxDaysBefore     Int      @default(5)
+  pickupAddress     String   @default("")
+  updatedAt         DateTime @updatedAt
+}
+
+model TwoFactor {
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  secret                String
+  backupCodes           String
+  verified              Boolean   @default(false)
+  failedVerificationCount Int      @default(0)
+  lockedUntil           DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

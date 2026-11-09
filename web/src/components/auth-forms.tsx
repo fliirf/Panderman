@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { authClient } from "@/lib/auth-client";
 
 // ponytail: semua form auth masih mock (tanpa request). Backend: Better Auth + plugin 2FA/OTP.
 const fake = () => new Promise((r) => setTimeout(r, 500));
@@ -26,74 +27,190 @@ function Field({ id, label, ...props }: { id: string; label: string } & React.Co
 export function LoginForm() {
   const router = useRouter();
   const [pending, start] = useTransition();
+
   return (
     <form
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        const id = new FormData(e.currentTarget).get("identitas") as string;
+
+        const formData = new FormData(e.currentTarget);
+        const email = formData.get("identitas") as string;
+        const password = formData.get("password") as string;
+
         start(async () => {
-          await fake();
-          router.push(`/verifikasi?ke=${encodeURIComponent(id)}`);
+          const { data, error } = await authClient.signIn.email({
+            email,
+            password,
+            callbackURL: "/pesanan",
+          });
+
+          if (error) {
+            toast.error(error.message || "Login gagal.");
+            return;
+          }
+
+          if (data && "twoFactorRedirect" in data && data.twoFactorRedirect) {
+            return;
+          }
+
+          router.push("/pesanan");
+          router.refresh();
         });
       }}
     >
       <div className="space-y-1">
-        <h1 className="font-display text-4xl leading-[1.05]">Masuk</h1>
-        <p className="text-sm text-muted-foreground">Gunakan nomor HP atau email yang terdaftar.</p>
+        <h1 className="font-display text-4xl leading-[1.05]">
+          Masuk
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Gunakan email dan password yang terdaftar.
+        </p>
       </div>
-      <Field id="identitas" label="Nomor HP atau email" placeholder="08xx atau nama@email.com" autoComplete="username" required />
+
+      <Field
+        id="identitas"
+        label="Email"
+        type="email"
+        placeholder="nama@email.com"
+        autoComplete="username"
+        required
+      />
+
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="password">Password</Label>
-          <Link href="/lupa-password" className="text-xs text-muted-foreground hover:text-foreground">Lupa password?</Link>
+          <Link
+            href="/lupa-password"
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Lupa password?
+          </Link>
         </div>
-        <Input id="password" type="password" className="h-11" autoComplete="current-password" required minLength={8} />
+
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          className="h-11"
+          autoComplete="current-password"
+          required
+          minLength={8}
+        />
       </div>
-      <Button type="submit" disabled={pending} className="w-full">{pending && <Loader2 className="animate-spin" />}Masuk</Button>
-      <p className="text-center text-sm text-muted-foreground">Belum punya akun? <Link href="/daftar" className="font-medium text-foreground hover:underline">Daftar</Link></p>
+
+      <Button
+        type="submit"
+        disabled={pending}
+        className="w-full"
+      >
+        {pending && <Loader2 className="animate-spin" />}
+        Masuk
+      </Button>
+
+      <p className="text-center text-sm text-muted-foreground">
+        Belum punya akun?{" "}
+        <Link
+          href="/daftar"
+          className="font-medium text-foreground hover:underline"
+        >
+          Daftar
+        </Link>
+      </p>
     </form>
   );
 }
 
 export function RegisterForm() {
   const router = useRouter();
-  const [via, setVia] = useState<"hp" | "email">("hp");
   const [pending, start] = useTransition();
+
   return (
     <form
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        const id = new FormData(e.currentTarget).get("identitas") as string;
+
+        const formData = new FormData(e.currentTarget);
+
+        const name = formData.get("nama") as string;
+        const email = formData.get("identitas") as string;
+        const password = formData.get("password") as string;
+
         start(async () => {
-          await fake();
-          router.push(`/verifikasi?ke=${encodeURIComponent(id)}`);
+          const { error } = await authClient.signUp.email({
+            name,
+            email,
+            password,
+            callbackURL: "/masuk",
+          });
+
+          if (error) {
+            console.error("REGISTRATION ERROR:", error);
+            toast.error(error.message || "Registrasi gagal.");
+            return;
+          }
+
+          toast.success("Akun berhasil dibuat!");
+
+          router.replace("/masuk");
         });
       }}
     >
       <div className="space-y-1">
-        <h1 className="font-display text-4xl leading-[1.05]">Buat akun</h1>
-        <p className="text-sm text-muted-foreground">Gratis. Katalog bisa dilihat tanpa akun, akun dibutuhkan saat checkout.</p>
+        <h1 className="font-display text-4xl leading-[1.05]">
+          Buat akun
+        </h1>
+
+        <p className="text-sm text-muted-foreground">
+          Gratis. Katalog bisa dilihat tanpa akun, akun dibutuhkan saat checkout.
+        </p>
       </div>
-      <Field id="nama" label="Nama lengkap" autoComplete="name" required />
-      <div className="space-y-2">
-        <div className="flex rounded-lg bg-muted p-1 text-sm">
-          {(["hp", "email"] as const).map((v) => (
-            <button type="button" key={v} onClick={() => setVia(v)} className={cn("flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md transition", via === v ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}>
-              {v === "hp" ? <Smartphone className="size-4" /> : <Mail className="size-4" />} {v === "hp" ? "Nomor HP" : "Email"}
-            </button>
-          ))}
-        </div>
-        {via === "hp" ? (
-          <Input id="identitas" name="identitas" type="tel" inputMode="tel" placeholder="08xxxxxxxxxx" className="h-11" autoComplete="tel" required pattern="0[0-9]{9,13}" title="Nomor HP diawali 0, 10–14 digit" />
-        ) : (
-          <Input id="identitas" name="identitas" type="email" placeholder="nama@email.com" className="h-11" autoComplete="email" required />
-        )}
-      </div>
-      <Field id="password" label="Password" type="password" autoComplete="new-password" minLength={8} required placeholder="Minimal 8 karakter" />
-      <Button type="submit" disabled={pending} className="w-full">{pending && <Loader2 className="animate-spin" />}Daftar</Button>
-      <p className="text-center text-sm text-muted-foreground">Sudah punya akun? <Link href="/masuk" className="font-medium text-foreground hover:underline">Masuk</Link></p>
+
+      <Field
+        id="nama"
+        label="Nama lengkap"
+        autoComplete="name"
+        required
+      />
+
+      <Field
+        id="identitas"
+        label="Email"
+        type="email"
+        placeholder="nama@email.com"
+        autoComplete="email"
+        required
+      />
+
+      <Field
+        id="password"
+        label="Password"
+        type="password"
+        autoComplete="new-password"
+        minLength={8}
+        required
+        placeholder="Minimal 8 karakter"
+      />
+
+      <Button
+        type="submit"
+        disabled={pending}
+        className="w-full"
+      >
+        {pending && <Loader2 className="animate-spin" />}
+        Daftar
+      </Button>
+
+      <p className="text-center text-sm text-muted-foreground">
+        Sudah punya akun?{" "}
+        <Link
+          href="/masuk"
+          className="font-medium text-foreground hover:underline"
+        >
+          Masuk
+        </Link>
+      </p>
     </form>
   );
 }
@@ -104,61 +221,166 @@ export function OtpForm({ to }: { to: string }) {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [left, setLeft] = useState(RESEND);
-  const [tries, setTries] = useState(0);
   const [pending, start] = useTransition();
-  const isEmail = to.includes("@");
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
 
   useEffect(() => {
     if (left <= 0) return;
+
     const t = setTimeout(() => setLeft(left - 1), 1000);
     return () => clearTimeout(t);
   }, [left]);
 
-  const locked = tries >= 5; // NFR-02: dikunci 15 menit setelah 5x salah (ditegakkan di server nanti)
+  // Mengirim OTP ketika halaman verifikasi dibuka.
+  useEffect(() => {
+    let active = true;
 
-  function verify(v: string) {
-    start(async () => {
-      await fake();
-      // ponytail: mock, kode benar = 123456
-      if (v === "123456") {
-        toast.success("Berhasil masuk");
-        router.push("/pesanan");
+    async function sendInitialOtp() {
+      setSendingOtp(true);
+
+      const { error } = await authClient.twoFactor.sendOtp();
+
+      if (!active) return;
+
+      if (error) {
+        toast.error(error.message || "Gagal mengirim kode OTP.");
       } else {
-        setTries((t) => t + 1);
-        setCode("");
-        toast.error("Kode salah");
+        setOtpSent(true);
+        toast.success("Kode OTP berhasil dikirim ke email.");
       }
+
+      setSendingOtp(false);
+    }
+
+    void sendInitialOtp();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Memverifikasi OTP.
+  function verify(v: string) {
+    if (v.length !== 6 || pending || !otpSent) return;
+
+    start(async () => {
+      const { error } = await authClient.twoFactor.verifyOtp({
+        code: v,
+        trustDevice: false,
+      });
+
+      if (error) {
+        setCode("");
+        toast.error(error.message || "Kode OTP tidak valid.");
+        return;
+      }
+
+      toast.success("Berhasil masuk!");
+      router.replace("/pesanan");
+      router.refresh();
     });
+  }
+
+  // Mengirim ulang OTP.
+  async function resendOtp() {
+    setSendingOtp(true);
+
+    const { error } = await authClient.twoFactor.sendOtp();
+
+    if (error) {
+      toast.error(error.message || "Gagal mengirim ulang OTP.");
+    } else {
+      setCode("");
+      setLeft(RESEND);
+      setOtpSent(true);
+      toast.success("Kode OTP baru berhasil dikirim.");
+    }
+
+    setSendingOtp(false);
   }
 
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <span className="grid size-11 place-items-center rounded-full bg-janur text-janur-foreground">{isEmail ? <Mail className="size-5" /> : <MessageCircle className="size-5" />}</span>
-        <h1 className="font-display text-4xl leading-[1.05]">Masukkan kode verifikasi</h1>
+        <span className="grid size-11 place-items-center rounded-full bg-janur text-janur-foreground">
+          <Mail className="size-5" />
+        </span>
+
+        <h1 className="font-display text-4xl leading-[1.05]">
+          Masukkan kode verifikasi
+        </h1>
+
         <p className="text-sm text-muted-foreground">
-          Kode 6 digit dikirim {isEmail ? "ke email" : "lewat WhatsApp ke"} <b className="text-foreground">{to || "akun Anda"}</b>. Berlaku 5 menit.
+          Kode 6 digit dikirim ke email{" "}
+          <b className="text-foreground">{to || "akun Anda"}</b>.
+          Berlaku 5 menit.
         </p>
       </div>
-      <InputOTP maxLength={6} value={code} disabled={pending || locked} onChange={(v) => { setCode(v); if (v.length === 6) verify(v); }} autoFocus>
+
+      <InputOTP
+        maxLength={6}
+        value={code}
+        disabled={pending || !otpSent || sendingOtp}
+        onChange={(v) => {
+          setCode(v);
+          if (v.length === 6) verify(v);
+        }}
+        autoFocus
+      >
         <InputOTPGroup className="w-full justify-between">
-          {Array.from({ length: 6 }, (_, i) => <InputOTPSlot key={i} index={i} className="size-12 text-lg" />)}
+          {Array.from({ length: 6 }, (_, i) => (
+            <InputOTPSlot
+              key={i}
+              index={i}
+              className="size-12 text-lg"
+            />
+          ))}
         </InputOTPGroup>
       </InputOTP>
-      {locked ? (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:text-red-400">Terlalu banyak percobaan. Coba lagi dalam 15 menit.</p>
-      ) : tries > 0 ? (
-        <p className="text-sm text-red-600 dark:text-red-400">Kode salah. Sisa {5 - tries} percobaan.</p>
+
+      {!otpSent ? (
+        <p className="text-sm text-muted-foreground">
+          {sendingOtp
+            ? "Sedang mengirim kode OTP..."
+            : "Kode OTP belum berhasil dikirim. Silakan coba kirim ulang."}
+        </p>
       ) : (
-        <p className="text-xs text-muted-foreground">Mode demo: gunakan kode <span className="font-mono">123456</span>.</p>
+        <p className="text-xs text-muted-foreground">
+          Masukkan kode OTP yang dikirim ke email kamu.
+        </p>
       )}
-      <Button className="w-full" disabled={code.length < 6 || pending || locked} onClick={() => verify(code)}>{pending && <Loader2 className="animate-spin" />}Verifikasi</Button>
+
+      <Button
+        className="w-full"
+        disabled={code.length < 6 || pending || !otpSent}
+        onClick={() => verify(code)}
+      >
+        {pending && <Loader2 className="animate-spin" />}
+        Verifikasi
+      </Button>
+
       <div className="flex justify-between text-sm">
-        <Link href="/masuk" className="text-muted-foreground hover:text-foreground">← Kembali</Link>
+        <Link
+          href="/masuk"
+          className="text-muted-foreground hover:text-foreground"
+        >
+          ← Kembali
+        </Link>
+
         {left > 0 ? (
-          <span className="text-muted-foreground tabular">Kirim ulang dalam {left} dtk</span>
+          <span className="text-muted-foreground tabular">
+            Kirim ulang dalam {left} dtk
+          </span>
         ) : (
-          <button className="font-medium text-primary" onClick={() => { setLeft(RESEND); toast("Kode baru dikirim"); }}>Kirim ulang kode</button>
+          <button
+            type="button"
+            className="font-medium text-primary"
+            disabled={sendingOtp}
+            onClick={resendOtp}
+          >
+            {sendingOtp ? "Mengirim..." : "Kirim ulang kode"}
+          </button>
         )}
       </div>
     </div>

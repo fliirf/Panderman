@@ -42,3 +42,16 @@ next-env.d.ts
 
 /storage
 /src/generated
+
+@"
+
+# Environment and secrets
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+**/node_modules/
+**/.next/
+**/src/generated/prisma/
+"@ | Add-Content .gitignore
