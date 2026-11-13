@@ -1,11 +1,13 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function sendOTPEmail(
   email: string,
   otp: string
 ) {
+  // Dibuat saat dipakai, bukan saat file dimuat: build & halaman lain tetap jalan tanpa RESEND_API_KEY.
+  if (!process.env.RESEND_API_KEY) throw new Error("RESEND_API_KEY belum diisi di .env");
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
   const { data, error } = await resend.emails.send({
     from: process.env.EMAIL_FROM!,
     to: email,

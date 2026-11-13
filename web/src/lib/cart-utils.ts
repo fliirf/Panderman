@@ -1,6 +1,6 @@
 import type { CartLine, Item, Package } from "./types";
 
-export type ResolvedLine = CartLine & { name: string; price: number; category: Item["category"] | "paket"; slug: string; spec: string; hasTent: boolean; isPrasmanan: boolean; image?: string };
+export type ResolvedLine = CartLine & { name: string; price: number; category: Item["category"] | "paket"; slug: string; spec: string; hasTent: boolean; isPrasmanan: boolean; image?: string | null };
 
 /** Gabungkan isi keranjang dengan data barang/paket. Baris yang barangnya sudah tidak ada dibuang. */
 export function resolveCart(lines: CartLine[], items: Item[], packages: Package[]): ResolvedLine[] {
