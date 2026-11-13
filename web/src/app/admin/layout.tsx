@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { AdminTopbar } from "@/components/admin-nav";
 import { getOrders } from "@/lib/data";
 
@@ -13,7 +12,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-[100dvh]">
       <AdminTopbar badge={badge} />
       <main className="mx-auto max-w-6xl space-y-8 px-4 pt-10 pb-20 sm:px-6">
-        <Suspense fallback={<div className="h-96 animate-pulse rounded-[1.75rem] bg-muted" />}>{children}</Suspense>
+        {children}
       </main>
     </div>
   );

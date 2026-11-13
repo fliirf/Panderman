@@ -1,4 +1,5 @@
 import { UsersThreeIcon as Users } from "@phosphor-icons/react/ssr";
+import { Suspense } from "react";
 import { PackageDialog } from "@/components/admin-forms";
 import { ItemImage, PageHeader } from "@/components/shared";
 import { getAllItems, getPackages } from "@/lib/data";
@@ -6,7 +7,11 @@ import { rupiah } from "@/lib/format";
 
 export const metadata = { title: "Paket" };
 
-export default async function PaketAdminPage() {
+export default function PaketAdminPage() {
+  return <Suspense fallback={<div className="h-96 animate-pulse rounded-[1.75rem] bg-muted" />}><Content /></Suspense>;
+}
+
+async function Content() {
   const [items, packages] = await Promise.all([getAllItems(), getPackages()]);
   return (
     <>

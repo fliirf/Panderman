@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { ItemDialog } from "@/components/admin-forms";
 import { ItemImage, PageHeader } from "@/components/shared";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -6,7 +7,11 @@ import { CATEGORY_LABEL, rupiah, UNIT_LABEL } from "@/lib/format";
 
 export const metadata = { title: "Barang" };
 
-export default async function BarangAdminPage() {
+export default function BarangAdminPage() {
+  return <Suspense fallback={<div className="h-96 animate-pulse rounded-[1.75rem] bg-muted" />}><Content /></Suspense>;
+}
+
+async function Content() {
   const items = await getAllItems();
   return (
     <>
